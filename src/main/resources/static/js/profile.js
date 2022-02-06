@@ -11,23 +11,77 @@
  */
 
 // (1) 유저 프로파일 페이지 구독하기, 구독취소
-function toggleSubscribe(obj) {
+function toggleSubscribe(toUserId, obj) {
 	if ($(obj).text() === "구독취소") {
-		$(obj).text("구독하기");
-		$(obj).toggleClass("blue");
+
+		$.ajax({
+			type: "delete",
+			url:"/api/subscribe/" + toUserId,
+			dataType:"json"
+		}).done(res=>{
+			$(obj).text("구독하기");
+			$(obj).toggleClass("blue");
+		}).fail(error=>{
+			console.log("구독취소실패", error);
+		});
+
+
 	} else {
-		$(obj).text("구독취소");
-		$(obj).toggleClass("blue");
+
+		$.ajax({
+			type: "post",
+			url:"/api/subscribe/" + toUserId,
+			dataType:"json"
+		}).done(res=>{
+			$(obj).text("구독취소");
+			$(obj).toggleClass("blue");
+		}).fail(error=>{
+			console.log("구독하기실패", error);
+		});
+
 	}
 }
 
 // (2) 구독자 정보  모달 보기
-function subscribeInfoModalOpen() {
+function subscribeInfoModalOpen(pageUserId) {
 	$(".modal-subscribe").css("display", "flex");
+
+	$.ajax({
+		url: `/api/user/${pageUserId}/subscribe`,
+		dataType:"json"
+	}).done(res=>{
+		console.log(res.data);
+		res.data.forEach((u)=>{
+			let item = getSubscribeModalItem(u);
+			$("#subscribeModalList").append(item);
+		});
+	}).fail(error=>{
+		console.log("구독정보 불러오기 오류", error);
+	});
 }
 
-function getSubscribeModalItem() {
+function getSubscribeModalItem(u) {
+	let item = `<div class="subscribe__item" id="subscribeModalItem-${u.id}">
+<div class="subscribe__img">
+<img src="/upload/${u.profileImageUrl}" onerror="this.src='/images/person.jpeg'"/>
+</div>
+<div class="subscribe__text">
+<h2>${u.username}</h2>
+</div>
+<div class="subscribe__btn">`;
 
+	if(!u.equalUserState){			// 동일유저가 아닐때 버튼 만들어져야
+		 if(u.subscribeState){		// 구독한 상태
+			 item += `<button class="cta blue" onClick="toggleSubscribe(${u.id}, this)">구독취소</button>`;
+		 } else {					// 구독안한상태
+			 item += `<button class="cta" onClick="toggleSubscribe(${u.id}, this)">구독하기</button>`;
+		 }
+	}
+item += `
+</div>
+</div>`;
+
+	return item;
 }
 
 
@@ -43,7 +97,13 @@ function toggleSubscribeModal(obj) {
 }
 
 // (4) 유저 프로파일 사진 변경 (완)
-function profileImageUpload() {
+function profileImageUpload(pageUserId, principalId) {
+
+	if(pageUserId != principalId){
+		alert("프로필 사진을 수정할 수 없는 유저입니다");
+		return;
+	}
+
 	$("#userProfileImageInput").click();
 
 	$("#userProfileImageInput").on("change", (e) => {
@@ -54,12 +114,31 @@ function profileImageUpload() {
 			return;
 		}
 
-		// 사진 전송 성공시 이미지 변경
-		let reader = new FileReader();
-		reader.onload = (e) => {
-			$("#userProfileImage").attr("src", e.target.result);
-		}
-		reader.readAsDataURL(f); // 이 코드 실행시 reader.onload 실행됨.
+		// 서버에 이미지 전송
+		let profileImageForm = $("#userProfileImageForm")[0];
+
+		// FormDate객체를 이용하면 form태그의 필드와 그 값을 나타내는 일련의 key/value쌍을 담을 수 있다. 사진전송시. ajax데이터전송시 formDate로 감싸기 위해
+		let formData = new FormData(profileImageForm);
+
+		$.ajax({
+			type:"put",
+			url:`/api/user/${principalId}/profileImageUrl`,
+			data:formData,
+			contentType:false,		// 사진 전송시 필수 : x-www-form-urlencoded로 파싱되는 것 방지
+			processData:false,		// 사진 전송시 필수 : contentType:false로 줬을때 QueryString자동설정되는것 해제
+			enctype:"multipart/form-data",
+			dataType:"json"
+		}).done(res=>{
+			// 사진 전송 성공시 이미지 변경
+			let reader = new FileReader();
+			reader.onload = (e) => {
+				$("#userProfileImage").attr("src", e.target.result);
+			}
+			reader.readAsDataURL(f); // 이 코드 실행시 reader.onload 실행됨.
+		}).fail(error=>{
+			console.log("오류", error);
+		})
+
 	});
 }
 
