@@ -2,7 +2,7 @@
 
 
 ### Tool
-IntelliJ
+Mac / IntelliJ
 
 
 ### Dependency
